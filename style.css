@@ -1,0 +1,83 @@
+:root {
+  --panel: rgba(8, 12, 20, 0.82);
+  --panel-border: rgba(255, 255, 255, 0.16);
+  --text: #e9eef7;
+  --accent: #58a6ff;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top, #1a2640 0%, #0a0f1b 70%);
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text);
+}
+#game-container {
+  position: relative;
+  width: 1000px;
+  height: 700px;
+  border: 2px solid #2e415f;
+  border-radius: 10px;
+  overflow: hidden;
+}
+#gameCanvas { display: block; width: 1000px; height: 700px; }
+.overlay-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--panel-border);
+  z-index: 5;
+}
+#top-bar { top: 0; }
+#bottom-bar { bottom: 0; border-top: 1px solid var(--panel-border); border-bottom: 0; }
+#left-sidebar {
+  position: absolute;
+  top: 58px;
+  left: 10px;
+  width: 220px;
+  bottom: 58px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  z-index: 5;
+}
+#part-palette { display: flex; flex-direction: column; gap: 8px; }
+.part-item {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  color: #09101f;
+}
+.part-item[data-type='nose'] { background: #f6d66d; }
+.part-item[data-type='capsule'] { background: #78c6ff; }
+.part-item[data-type='tank'] { background: #89d67d; }
+.part-item[data-type='engine'] { background: #ff9e57; }
+.part-item.selected { outline: 3px solid #ffffff; }
+button {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: #1f2b44;
+  color: #f4f7ff;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+.hint { font-size: 12px; line-height: 1.35; color: #cad3e8; }
+.hidden { display: none !important; }
+#flight-stats { display: flex; gap: 14px; font-size: 14px; font-weight: 700; }
+#throttle-wrap { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+#throttle-slider { width: 180px; }
