@@ -4,9 +4,7 @@
   --text: #e9eef7;
   --accent: #58a6ff;
 }
-
 * { box-sizing: border-box; }
-
 body {
   margin: 0;
   min-height: 100vh;
@@ -17,7 +15,6 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   color: var(--text);
 }
-
 #game-container {
   position: relative;
   width: 1000px;
@@ -25,16 +22,8 @@ body {
   border: 2px solid #2e415f;
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.4);
 }
-
-#gameCanvas {
-  display: block;
-  width: 1000px;
-  height: 700px;
-  background: #050810;
-}
-
+#gameCanvas { display: block; width: 1000px; height: 700px; }
 .overlay-bar {
   position: absolute;
   left: 0;
@@ -48,21 +37,13 @@ body {
   border-bottom: 1px solid var(--panel-border);
   z-index: 5;
 }
-
 #top-bar { top: 0; }
-
-#bottom-bar {
-  bottom: 0;
-  border-top: 1px solid var(--panel-border);
-  border-bottom: 0;
-  justify-content: center;
-}
-
+#bottom-bar { bottom: 0; border-top: 1px solid var(--panel-border); border-bottom: 0; }
 #left-sidebar {
   position: absolute;
   top: 58px;
   left: 10px;
-  width: 185px;
+  width: 220px;
   bottom: 58px;
   padding: 10px;
   background: var(--panel);
@@ -70,48 +51,20 @@ body {
   border-radius: 8px;
   z-index: 5;
 }
-
-#left-sidebar h3 {
-  margin: 0 0 10px;
-  font-size: 16px;
-  color: var(--accent);
-}
-
-#part-palette {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
+#part-palette { display: flex; flex-direction: column; gap: 8px; }
 .part-item {
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 6px;
   padding: 8px;
   cursor: pointer;
-  user-select: none;
-  font-size: 13px;
   font-weight: 700;
-  text-align: center;
   color: #09101f;
 }
-
 .part-item[data-type='nose'] { background: #f6d66d; }
 .part-item[data-type='capsule'] { background: #78c6ff; }
 .part-item[data-type='tank'] { background: #89d67d; }
 .part-item[data-type='engine'] { background: #ff9e57; }
-
-.part-item.selected {
-  outline: 3px solid #ffffff;
-  box-shadow: 0 0 0 2px #1b2940 inset;
-}
-
-.hint {
-  margin-top: 12px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: #cad3e8;
-}
-
+.part-item.selected { outline: 3px solid #ffffff; }
 button {
   border: 1px solid rgba(255, 255, 255, 0.25);
   background: #1f2b44;
@@ -122,17 +75,9 @@ button {
   font-weight: 700;
   cursor: pointer;
 }
-
-button:hover:enabled { background: #29406a; }
 button:disabled { opacity: 0.45; cursor: not-allowed; }
-
+.hint { font-size: 12px; line-height: 1.35; color: #cad3e8; }
 .hidden { display: none !important; }
-
-#flight-stats {
-  display: flex;
-  gap: 14px;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-#mode-indicator { font-weight: 700; }
+#flight-stats { display: flex; gap: 14px; font-size: 14px; font-weight: 700; }
+#throttle-wrap { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+#throttle-slider { width: 180px; }

@@ -1,243 +1,201 @@
 import { gameState, MODES, on, setMode, validateNumber, emit } from './stateManager.js';
 
-const GRAVITY = 420;
-const DRAG = 0.992;
-const GROUND_Y = 620;
-const FUEL_BURN = 180;
+const CELL = 40;
+const partPixel = { nose: 60, capsule: 50, tank: 80, engine: 50 };
 
-const partHeights = { nose: 60, capsule: 50, tank: 80, engine: 50 };
+function clampDt(dt) { return Math.min(0.05, Math.max(1 / 240, Number.isFinite(dt) ? dt : 1 / 60)); }
 
-function clampDt(dt) {
-  if (!Number.isFinite(dt) || dt <= 0) return 1 / 60;
-  return Math.min(dt, 0.05);
+function toLocal(part, originY) {
+  const h = partPixel[part.type] || 40;
+  return { ...part, px: part.x * CELL, py: part.y * CELL + (CELL - h) - originY, w: part.width * CELL, h };
 }
 
-function buildFlightStack(parts) {
-  const sorted = [...parts].sort((a, b) => a.y - b.y);
-  let cursorY = 0;
-  const stack = sorted.map((part) => {
-    const h = partHeights[part.type] || 40;
-    const entry = {
-      type: part.type,
-      mass: part.mass,
-      fuel: part.fuel,
-      maxFuel: part.maxFuel,
-      thrust: part.thrust,
-      offsetX: 0,
-      offsetY: cursorY,
-      height: h,
-      fuelRatio: part.maxFuel > 0 ? part.fuel / part.maxFuel : 1
-    };
-    cursorY += h;
-    return entry;
+function aggregateRocket() {
+  if (!gameState.rocketParts.length) return null;
+  const top = Math.min(...gameState.rocketParts.map((p) => p.y * CELL + (CELL - (partPixel[p.type] || 40))));
+  const parts = gameState.rocketParts.map((p) => toLocal(p, top));
+  const h = Math.max(...parts.map((p) => p.py + p.h));
+  return { x: 500, y: 620 - h / 2, vx: 0, vy: 0, angle: 0, angularVelocity: 0, parts, height: h, alive: true };
+}
+
+function computeMassAndCom(rocket) {
+  let mass = 0; let mx = 0; let my = 0;
+  rocket.parts.forEach((p) => {
+    const m = p.mass + (p.type === 'tank' ? p.fuel : 0);
+    const cx = p.px + p.w / 2;
+    const cy = p.py + p.h / 2;
+    mass += m;
+    mx += cx * m;
+    my += cy * m;
   });
-  return { stack, height: cursorY };
+  if (mass <= 0) return { mass: 1, comX: 0, comY: 0 };
+  return { mass, comX: mx / mass, comY: my / mass };
 }
 
-function computeCenterOfMass(parts) {
-  let weighted = 0;
-  let massSum = 0;
-  parts.forEach((part) => {
-    const partMass = part.mass + part.fuel;
-    const centerY = part.offsetY + part.height * 0.5;
-    weighted += centerY * partMass;
-    massSum += partMass;
+function nearestTankAbove(engine, parts) {
+  const tanks = parts.filter((p) => p.type === 'tank' && p.fuel > 0 && (p.connectedTo === engine.connectedTo || p.id === engine.connectedTo || true));
+  let best = null;
+  let bestDist = Infinity;
+  tanks.forEach((t) => {
+    if (t.py > engine.py) return;
+    const d = Math.abs((t.px + t.w / 2) - (engine.px + engine.w / 2)) + Math.abs((t.py + t.h) - engine.py);
+    if (d < bestDist) { bestDist = d; best = t; }
   });
-  return massSum > 0 ? weighted / massSum : 0;
+  return best;
 }
 
-function aggregateRocketForFlight() {
-  const parts = gameState.rocketParts;
-  if (!parts.length) {
-    console.warn('Cannot launch: no parts present.');
-    return null;
-  }
-
-  const { stack, height } = buildFlightStack(parts);
-  const dryMass = stack.reduce((sum, p) => sum + p.mass, 0);
-  const totalFuel = stack.reduce((sum, p) => sum + p.fuel, 0);
-  const totalThrust = stack.reduce((sum, p) => sum + p.thrust, 0);
-  const centerOfMass = computeCenterOfMass(stack);
-
-  return {
-    x: 500,
-    y: GROUND_Y - height / 2,
-    vx: 0,
-    vy: 0,
-    angle: 0,
-    angularVelocity: 0,
-    width: 40,
-    height,
-    dryMass,
-    fuel: totalFuel,
-    thrust: totalThrust,
-    engineCount: stack.filter((p) => p.type === 'engine').length,
-    parts: stack,
-    centerOfMass,
-    alive: true
-  };
-}
-
-function launchSetup() {
-  const rocket = aggregateRocketForFlight();
-  if (!rocket) {
-    setMode(MODES.BUILD_MODE);
-    return;
-  }
-
-  gameState.flight.world.gravity = GRAVITY;
-  gameState.flight.world.drag = DRAG;
-  gameState.flight.world.groundY = GROUND_Y;
-  gameState.flight.world.restitution = 0.25;
-
-  gameState.flight.active = true;
-  gameState.flight.rocket = rocket;
-  gameState.flight.particles = [];
-  gameState.flight.thrusting = false;
-  gameState.flight.crashed = false;
-  gameState.flight.landed = false;
-  gameState.flight.crashTimer = 0;
-  gameState.camera.y = 0;
-}
-
-function sanitizeRocket(rocket) {
-  rocket.x = validateNumber(rocket.x, 500, 'rocket.x');
-  rocket.y = validateNumber(rocket.y, 300, 'rocket.y');
-  rocket.vx = validateNumber(rocket.vx, 0, 'rocket.vx');
-  rocket.vy = validateNumber(rocket.vy, 0, 'rocket.vy');
-  rocket.angle = validateNumber(rocket.angle, 0, 'rocket.angle');
-  rocket.angularVelocity = validateNumber(rocket.angularVelocity, 0, 'rocket.angularVelocity');
-  rocket.fuel = Math.max(0, validateNumber(rocket.fuel, 0, 'rocket.fuel'));
-}
-
-function applyFuelBurn(rocket, amount) {
-  let remaining = amount;
-  rocket.parts.forEach((part) => {
-    if (part.type !== 'tank' || remaining <= 0 || part.fuel <= 0) return;
-    const used = Math.min(part.fuel, remaining);
-    part.fuel -= used;
-    part.fuelRatio = part.maxFuel > 0 ? part.fuel / part.maxFuel : 1;
-    remaining -= used;
-  });
-  rocket.fuel = Math.max(0, rocket.parts.reduce((sum, p) => sum + (p.type === 'tank' ? p.fuel : 0), 0));
-}
-
-function spawnFlame(rocket) {
+function spawnEngineFlame(rocket, engineWorldX, engineWorldY) {
   for (let i = 0; i < 12; i += 1) {
-    const baseY = rocket.y + rocket.height / 2;
     gameState.flight.particles.push({
-      x: rocket.x + (Math.random() - 0.5) * 18,
-      y: baseY + 2,
+      x: engineWorldX + (Math.random() - 0.5) * 10,
+      y: engineWorldY,
       vx: (Math.random() - 0.5) * 80,
-      vy: 140 + Math.random() * 210,
-      life: 0.35 + Math.random() * 0.25,
+      vy: 140 + Math.random() * 220,
+      life: 0.35 + Math.random() * 0.35,
       size: 2 + Math.random() * 4,
-      color: Math.random() > 0.66 ? '#ffffff' : Math.random() > 0.4 ? '#ffd166' : '#ff8f3f'
+      color: Math.random() > 0.65 ? '#ffffff' : Math.random() > 0.35 ? '#ffd166' : '#ff8f3f'
     });
   }
 }
 
-function spawnCrash(rocket) {
-  for (let i = 0; i < 70; i += 1) {
-    const a = Math.random() * Math.PI * 2;
-    const s = 60 + Math.random() * 260;
-    gameState.flight.particles.push({
-      x: rocket.x,
-      y: rocket.y,
-      vx: Math.cos(a) * s,
-      vy: Math.sin(a) * s,
-      life: 0.6 + Math.random() * 0.8,
-      size: 2 + Math.random() * 4,
-      color: Math.random() > 0.5 ? '#ff3b30' : '#ff7a45'
+function spawnCrashDebris(rocket) {
+  rocket.parts.forEach((p) => {
+    gameState.flight.debris.push({
+      x: rocket.x + p.px,
+      y: rocket.y + p.py,
+      vx: (Math.random() - 0.5) * 220,
+      vy: -120 - Math.random() * 180,
+      w: p.w,
+      h: p.h,
+      color: p.color,
+      life: 2
     });
-  }
+  });
+}
+
+function stageSeparation() {
+  const rocket = gameState.flight.rocket;
+  if (!rocket || rocket.parts.length < 2) return;
+  const maxY = Math.max(...rocket.parts.map((p) => p.y));
+  const dropped = rocket.parts.filter((p) => p.y === maxY);
+  rocket.parts = rocket.parts.filter((p) => p.y !== maxY);
+  dropped.forEach((p) => {
+    gameState.flight.debris.push({ x: rocket.x + p.px, y: rocket.y + p.py, vx: (Math.random() - 0.5) * 80, vy: 40, w: p.w, h: p.h, color: p.color, life: 3 });
+  });
 }
 
 function updateParticles(dt) {
-  gameState.flight.particles = gameState.flight.particles
-    .map((p) => ({
-      ...p,
-      x: p.x + p.vx * dt,
-      y: p.y + p.vy * dt,
-      vy: p.vy + 180 * dt,
-      life: p.life - dt
-    }))
-    .filter((p) => p.life > 0);
+  gameState.flight.particles = gameState.flight.particles.map((p) => ({ ...p, x: p.x + p.vx * dt, y: p.y + p.vy * dt, vy: p.vy + 180 * dt, life: p.life - dt })).filter((p) => p.life > 0);
+  gameState.flight.debris = gameState.flight.debris.map((d) => ({ ...d, x: d.x + d.vx * dt, y: d.y + d.vy * dt, vy: d.vy + 420 * dt, life: d.life - dt })).filter((d) => d.life > 0);
 }
 
 export function updatePhysics(rawDt) {
-  if (gameState.mode !== MODES.FLIGHT_MODE || !gameState.flight.active || !gameState.flight.rocket) return;
-
+  if (gameState.mode !== MODES.FLIGHT_MODE || !gameState.flight.rocket) return;
   const dt = clampDt(rawDt);
-  const rocket = gameState.flight.rocket;
-  sanitizeRocket(rocket);
+  const r = gameState.flight.rocket;
 
-  if (gameState.flight.crashed) {
-    gameState.flight.crashTimer -= dt;
+  if (!r.alive) {
     updateParticles(dt);
+    gameState.flight.crashTimer -= dt;
     if (gameState.flight.crashTimer <= 0) setMode(MODES.BUILD_MODE);
     return;
   }
 
-  const thrusting = gameState.keys.thrust && rocket.fuel > 0;
-  gameState.flight.thrusting = thrusting;
+  r.x = validateNumber(r.x, 500); r.y = validateNumber(r.y, 300);
+  r.vx = validateNumber(r.vx, 0); r.vy = validateNumber(r.vy, 0);
+  r.angle = validateNumber(r.angle, 0); r.angularVelocity = validateNumber(r.angularVelocity, 0);
 
-  const totalMass = Math.max(rocket.dryMass + rocket.fuel, 1);
-  const effectiveMass = Math.max(totalMass * 0.002, 1);
-  let ax = 0;
-  let ay = GRAVITY;
+  const { mass, comX, comY } = computeMassAndCom(r);
+  const throttle = gameState.throttleEnabled ? gameState.throttle / 100 : 0;
 
-  if (thrusting && rocket.thrust > 0) {
-    const thrustAccel = rocket.thrust / effectiveMass;
-    ax += -Math.sin(rocket.angle) * thrustAccel;
-    ay += -Math.cos(rocket.angle) * thrustAccel;
-    applyFuelBurn(rocket, rocket.engineCount * FUEL_BURN * dt);
-    spawnFlame(rocket);
-  }
+  let forceX = 0;
+  let forceY = mass * 420;
+  let torque = 0;
+
+  r.parts.forEach((part) => {
+    if (part.type !== 'engine' || throttle <= 0) return;
+    const tank = nearestTankAbove(part, r.parts);
+    if (!tank) return;
+    const fuelNeed = 180 * throttle * dt;
+    if (tank.fuel <= 0) return;
+    const used = Math.min(tank.fuel, fuelNeed);
+    tank.fuel -= used;
+
+    const thrust = part.thrust * throttle;
+    const fx = -Math.sin(r.angle) * thrust;
+    const fy = -Math.cos(r.angle) * thrust;
+    forceX += fx;
+    forceY += fy;
+
+    const ex = part.px + part.w / 2;
+    const ey = part.py + part.h;
+    const rx = ex - comX;
+    const ry = ey - comY;
+    torque += rx * fy - ry * fx;
+
+    spawnEngineFlame(r, r.x + ex, r.y + ey);
+  });
+
+  const speed = Math.hypot(r.vx, r.vy);
+  const drag = 0.08 * speed;
+  forceX += -r.vx * drag;
+  forceY += -r.vy * drag;
 
   const rotateInput = Number(gameState.keys.rotateRight) - Number(gameState.keys.rotateLeft);
-  rocket.angularVelocity += rotateInput * 2.5 * dt;
-  rocket.angularVelocity *= 0.988;
-  rocket.angle += rocket.angularVelocity * dt;
+  r.angularVelocity += rotateInput * 2.5 * dt;
 
-  rocket.vx += ax * dt;
-  rocket.vy += ay * dt;
-  rocket.vx *= DRAG;
-  rocket.vy *= DRAG;
+  const inertia = Math.max(mass * (r.height * r.height) / 12, 1);
+  r.angularVelocity += (torque / inertia) * dt;
+  r.angularVelocity *= 0.992;
+  r.angle += r.angularVelocity * dt;
 
-  rocket.x += rocket.vx * dt;
-  rocket.y += rocket.vy * dt;
+  r.vx += (forceX / mass) * dt;
+  r.vy += (forceY / mass) * dt;
+  r.vx *= 0.992;
+  r.vy *= 0.992;
+  r.x += r.vx * dt;
+  r.y += r.vy * dt;
 
-  const bottom = rocket.y + rocket.height / 2;
-  if (bottom >= GROUND_Y) {
-    rocket.y = GROUND_Y - rocket.height / 2;
-    if (rocket.vy > 120) {
+  const bottomY = r.y + r.height / 2;
+  if (bottomY >= 620) {
+    r.y = 620 - r.height / 2;
+    if (r.vy > 80) {
+      r.alive = false;
       gameState.flight.crashed = true;
-      rocket.alive = false;
-      gameState.flight.crashTimer = 1.2;
-      spawnCrash(rocket);
+      gameState.flight.crashTimer = 1.5;
+      spawnCrashDebris(r);
       emit('flightEvent', { type: 'crash' });
     } else {
-      rocket.vy = -rocket.vy * 0.25;
-      if (Math.abs(rocket.vy) < 4) rocket.vy = 0;
+      if (Math.abs(r.vy) < 40) gameState.flight.landed = true;
+      r.vy = -r.vy * 0.25;
+      if (Math.abs(r.vy) < 4) r.vy = 0;
     }
   }
 
   updateParticles(dt);
-
-  const targetCamY = rocket.y - 360;
-  gameState.camera.y += (targetCamY - gameState.camera.y) * Math.min(1, dt * 3.2);
+  gameState.camera.y += ((r.y - 350) - gameState.camera.y) * Math.min(1, dt * 3);
 }
 
 export function initPhysicsEngine() {
   on('modeChanged', (mode) => {
-    if (mode === MODES.FLIGHT_MODE) launchSetup();
+    if (mode === MODES.FLIGHT_MODE) {
+      gameState.flight.rocket = aggregateRocket();
+      gameState.flight.active = true;
+      gameState.flight.crashed = false;
+      gameState.flight.landed = false;
+      gameState.flight.particles = [];
+      gameState.flight.debris = [];
+      gameState.throttle = 0;
+      gameState.throttleEnabled = false;
+    }
     if (mode === MODES.BUILD_MODE) {
-      gameState.flight.active = false;
       gameState.flight.rocket = null;
-      gameState.flight.thrusting = false;
-      gameState.keys.thrust = false;
+      gameState.flight.active = false;
+      gameState.flight.particles = [];
+      gameState.flight.debris = [];
       gameState.dragPreview = null;
     }
   });
+
+  on('stage', () => stageSeparation());
 }

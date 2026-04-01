@@ -17,7 +17,7 @@
         <span id="altitude-display">Altitude: 0 m</span>
         <span id="velocity-display">Velocity: 0 m/s</span>
       </div>
-      <button id="reset-btn" type="button">Reset Game</button>
+      <button id="reset-btn" type="button">Reset / Restart</button>
     </div>
 
     <div id="left-sidebar">
@@ -28,12 +28,17 @@
         <button class="part-item" data-type="tank" type="button">Fuel Tank</button>
         <button class="part-item" data-type="engine" type="button">Engine</button>
       </div>
-      <p class="hint">Click a part, move over grid, release left mouse to place.<br />Right click a placed part to delete.</p>
+      <p class="hint">Select part, move on grid, release mouse to place. Press R to rotate selected part. Right-click to delete.</p>
     </div>
 
     <div id="bottom-bar" class="overlay-bar">
       <button id="launch-btn" type="button" disabled>Launch</button>
-      <button id="thrust-btn" type="button" class="hidden">Thrust</button>
+      <div id="throttle-wrap" class="hidden">
+        <label for="throttle-slider">Throttle</label>
+        <input id="throttle-slider" type="range" min="0" max="100" value="0" step="1" />
+        <span id="throttle-value">0%</span>
+      </div>
+      <button id="thrust-btn" type="button" class="hidden">Main Throttle</button>
       <button id="return-btn" type="button" class="hidden">Return to Build</button>
     </div>
   </div>
