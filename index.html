@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2D Spaceflight Simulator</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas" width="1000" height="700" aria-label="2D Spaceflight Simulator"></canvas>
+
+    <div id="top-bar" class="overlay-bar">
+      <div id="mode-indicator">Mode: BUILD</div>
+      <div id="flight-stats" class="hidden">
+        <span id="fuel-display">Fuel: 0</span>
+        <span id="altitude-display">Altitude: 0 m</span>
+        <span id="velocity-display">Velocity: 0 m/s</span>
+      </div>
+      <button id="reset-btn" type="button">Reset Game</button>
+    </div>
+
+    <div id="left-sidebar">
+      <h3>Parts</h3>
+      <div id="part-palette"></div>
+      <p class="hint">Left click drag to place.<br />Right click placed part to delete.</p>
+    </div>
+
+    <div id="bottom-bar" class="overlay-bar">
+      <button id="launch-btn" type="button" disabled>Launch</button>
+      <button id="thrust-btn" type="button" class="hidden">Thrust</button>
+      <button id="return-btn" type="button" class="hidden">Return to Build</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
