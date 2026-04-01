@@ -6,7 +6,7 @@ export const MODES = Object.freeze({
 const listeners = new Map();
 let nextPartId = 1;
 
-const buildOrigin = Object.freeze({ x: 200, y: 100 });
+const buildOrigin = Object.freeze({ x: 0, y: 0 });
 const grid = Object.freeze({ cols: 20, rows: 12, cellSize: 40 });
 
 const createDefaultState = () => ({
@@ -15,17 +15,15 @@ const createDefaultState = () => ({
   buildOrigin,
   rocketParts: [],
   selectedPartId: null,
-  draggingFromPalette: null,
+  selectedPartType: null,
+  dragPreview: null,
   launchReady: false,
   keys: {
     thrust: false,
     rotateLeft: false,
     rotateRight: false
   },
-  camera: {
-    x: 0,
-    y: 0
-  },
+  camera: { x: 0, y: 0 },
   flight: {
     active: false,
     rocket: null,
@@ -46,9 +44,7 @@ const createDefaultState = () => ({
 export const gameState = createDefaultState();
 
 export function on(event, cb) {
-  if (!listeners.has(event)) {
-    listeners.set(event, new Set());
-  }
+  if (!listeners.has(event)) listeners.set(event, new Set());
   listeners.get(event).add(cb);
   return () => listeners.get(event)?.delete(cb);
 }

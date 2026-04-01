@@ -1,7 +1,7 @@
 import { gameState, MODES } from './stateManager.js';
 import { getPartLibrary } from './buildSystem.js';
 
-const canvas = document.getElementById('game-canvas');
+const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const colorsByType = getPartLibrary().reduce((acc, p) => {
@@ -62,26 +62,36 @@ function drawGrid() {
   }
 }
 
+function drawPartRect(type, gridX, gridY, alpha = 1) {
+  const { buildOrigin, grid } = gameState;
+  const px = buildOrigin.x + gridX * grid.cellSize;
+  const py = buildOrigin.y + gridY * grid.cellSize;
+  const pw = grid.cellSize;
+  const ph = grid.cellSize;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = colorsByType[type] || '#bbbbbb';
+  ctx.fillRect(px + 2, py + 2, pw - 4, ph - 4);
+  ctx.strokeStyle = '#203246';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(px + 2, py + 2, pw - 4, ph - 4);
+  ctx.fillStyle = '#0b1020';
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(labelByType[type] || type.toUpperCase(), px + pw / 2, py + ph / 2 + 4);
+  ctx.restore();
+}
+
 function drawBuildParts() {
-  const { buildOrigin, grid, selectedPartId, rocketParts } = gameState;
-  rocketParts.forEach((part) => {
-    const px = buildOrigin.x + part.x * grid.cellSize;
-    const py = buildOrigin.y + part.y * grid.cellSize;
-    const pw = part.width * grid.cellSize;
-    const ph = part.height * grid.cellSize;
+  gameState.rocketParts.forEach((part) => {
+    drawPartRect(part.type, part.x, part.y, 1);
 
-    ctx.fillStyle = colorsByType[part.type] || '#bbbbbb';
-    ctx.fillRect(px + 2, py + 2, pw - 4, ph - 4);
-    ctx.strokeStyle = selectedPartId === part.id ? '#ffffff' : '#203246';
-    ctx.lineWidth = selectedPartId === part.id ? 3 : 2;
-    ctx.strokeRect(px + 2, py + 2, pw - 4, ph - 4);
-
-    ctx.fillStyle = '#0b1020';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(labelByType[part.type] || part.type.toUpperCase(), px + pw / 2, py + ph / 2 + 4);
-
-    if (selectedPartId === part.id && part.type === 'engine') {
+    if (gameState.selectedPartId === part.id && part.type === 'engine') {
+      const px = part.x * gameState.grid.cellSize;
+      const py = part.y * gameState.grid.cellSize;
+      const pw = gameState.grid.cellSize;
+      const ph = gameState.grid.cellSize;
       ctx.fillStyle = '#ff944d';
       ctx.beginPath();
       ctx.moveTo(px + pw / 2, py + ph + 10);
@@ -91,6 +101,11 @@ function drawBuildParts() {
       ctx.fill();
     }
   });
+}
+
+function drawPreview() {
+  if (!gameState.dragPreview) return;
+  drawPartRect(gameState.dragPreview.type, gameState.dragPreview.gridX, gameState.dragPreview.gridY, 0.6);
 }
 
 function drawFlightRocket() {
@@ -148,6 +163,7 @@ export function render() {
     drawGround(0);
     drawGrid();
     drawBuildParts();
+    drawPreview();
   } else {
     drawGround(gameState.camera.y);
     drawFlightRocket();

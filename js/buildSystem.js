@@ -7,16 +7,18 @@ const PART_LIBRARY = [
   { type: 'engine', label: 'Engine', mass: 40, fuel: 0, maxFuel: 0, thrust: 650, color: '#ff9e57' }
 ];
 
-const partPalette = document.getElementById('part-palette');
-const canvas = document.getElementById('game-canvas');
+const canvas = document.getElementById('gameCanvas');
+const rect = canvas.getBoundingClientRect();
 const launchBtn = document.getElementById('launch-btn');
+const paletteButtons = [...document.querySelectorAll('.part-item[data-type]')];
 
-let dragging = null;
+let selectedPartType = null;
+let dragPreview = null;
 
-function createPartTemplate(type) {
+function getPartTemplate(type) {
   const base = PART_LIBRARY.find((p) => p.type === type);
   if (!base) {
-    console.warn('Unknown part template requested:', type);
+    console.warn('Unknown part requested:', type);
     return null;
   }
   return {
@@ -36,70 +38,110 @@ function createPartTemplate(type) {
   };
 }
 
-function occupiesCell(targetX, targetY, ignorePartId = null) {
-  return gameState.rocketParts.some((part) => {
-    if (ignorePartId !== null && part.id === ignorePartId) return false;
-    return targetX >= part.x && targetX < part.x + part.width && targetY >= part.y && targetY < part.y + part.height;
+function updateSelectedButtonUi() {
+  paletteButtons.forEach((btn) => {
+    btn.classList.toggle('selected', btn.dataset.type === selectedPartType);
   });
 }
 
-function getGridCellFromMouse(event) {
-  const rect = canvas.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  const y = event.clientY - rect.top;
-  const { buildOrigin, grid } = gameState;
-
-  const col = Math.floor((x - buildOrigin.x) / grid.cellSize);
-  const row = Math.floor((y - buildOrigin.y) / grid.cellSize);
-  return { col, row };
+function setSelectedPartType(type) {
+  if (!PART_LIBRARY.some((p) => p.type === type)) return;
+  selectedPartType = type;
+  gameState.selectedPartType = type;
+  updateSelectedButtonUi();
 }
 
-function isInsideGrid(col, row) {
-  const { cols, rows } = gameState.grid;
-  return col >= 0 && col < cols && row >= 0 && row < rows;
+function getMouseGridPos(e) {
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const gridX = Math.floor(x / 40);
+  const gridY = Math.floor(y / 40);
+  return { gridX: Math.max(0, Math.min(19, gridX)), gridY: Math.max(0, Math.min(11, gridY)) };
 }
 
-function getPlacedPartAt(col, row) {
-  return gameState.rocketParts.find((part) => col >= part.x && col < part.x + part.width && row >= part.y && row < part.y + part.height) || null;
+function isInsideGrid(gridX, gridY) {
+  return gridX >= 0 && gridX < gameState.grid.cols && gridY >= 0 && gridY < gameState.grid.rows;
 }
 
-function addPaletteItem(part) {
-  const item = document.createElement('div');
-  item.className = 'part-item';
-  item.dataset.type = part.type;
-  item.textContent = part.label;
-  item.style.background = part.color;
-  item.addEventListener('mousedown', (event) => {
-    if (event.button !== 0 || gameState.mode !== MODES.BUILD_MODE) return;
-    dragging = { type: part.type };
-    gameState.draggingFromPalette = part.type;
-  });
-  partPalette.appendChild(item);
+function getPartAt(gridX, gridY) {
+  return gameState.rocketParts.find((part) => gridX >= part.x && gridX < part.x + part.width && gridY >= part.y && gridY < part.y + part.height) || null;
 }
 
-function placePartAt(col, row, type) {
-  if (!isInsideGrid(col, row) || occupiesCell(col, row)) return false;
-  const nextPart = createPartTemplate(type);
-  if (!nextPart) return false;
-  nextPart.x = col;
-  nextPart.y = row;
-  gameState.rocketParts.push(nextPart);
-  updateLaunchReady();
-  return true;
+function overlaps(gridX, gridY) {
+  return gameState.rocketParts.some((part) => gridX >= part.x && gridX < part.x + part.width && gridY >= part.y && gridY < part.y + part.height);
 }
 
-function removePartAt(col, row) {
-  const part = getPlacedPartAt(col, row);
+function updatePreview(gridX, gridY) {
+  if (!selectedPartType || !isInsideGrid(gridX, gridY)) {
+    dragPreview = null;
+    gameState.dragPreview = null;
+    return;
+  }
+  dragPreview = { type: selectedPartType, gridX, gridY };
+  gameState.dragPreview = dragPreview;
+}
+
+function placePreviewPart() {
+  if (!dragPreview) return;
+  const { gridX, gridY, type } = dragPreview;
+  if (overlaps(gridX, gridY)) {
+    dragPreview = null;
+    gameState.dragPreview = null;
+    return;
+  }
+
+  const part = getPartTemplate(type);
   if (!part) return;
-  gameState.rocketParts = gameState.rocketParts.filter((p) => p.id !== part.id);
-  if (gameState.selectedPartId === part.id) gameState.selectedPartId = null;
+  part.x = gridX;
+  part.y = gridY;
+  gameState.rocketParts.push(part);
+  updateLaunchReady();
+
+  dragPreview = { type: selectedPartType, gridX, gridY };
+  gameState.dragPreview = dragPreview;
+}
+
+function removePartAt(gridX, gridY) {
+  const found = getPartAt(gridX, gridY);
+  if (!found) return;
+  gameState.rocketParts = gameState.rocketParts.filter((part) => part.id !== found.id);
+  if (gameState.selectedPartId === found.id) gameState.selectedPartId = null;
   updateLaunchReady();
 }
 
-function selectPart(col, row) {
-  const part = getPlacedPartAt(col, row);
-  gameState.selectedPartId = part ? part.id : null;
-  emit('buildUpdated', gameState.rocketParts);
+export function getPartLibrary() {
+  return PART_LIBRARY;
+}
+
+export function handleCanvasMouseDown(event) {
+  if (gameState.mode !== MODES.BUILD_MODE || event.button !== 0) return;
+  const { gridX, gridY } = getMouseGridPos(event);
+  updatePreview(gridX, gridY);
+}
+
+export function handleCanvasMouseMove(event) {
+  if (gameState.mode !== MODES.BUILD_MODE || !selectedPartType) return;
+  const { gridX, gridY } = getMouseGridPos(event);
+  updatePreview(gridX, gridY);
+}
+
+export function handleCanvasMouseUp(event) {
+  if (gameState.mode !== MODES.BUILD_MODE || event.button !== 0 || !selectedPartType) return;
+  const { gridX, gridY } = getMouseGridPos(event);
+  updatePreview(gridX, gridY);
+  placePreviewPart();
+}
+
+export function handleCanvasContextMenu(event) {
+  if (gameState.mode !== MODES.BUILD_MODE) return;
+  event.preventDefault();
+  const { gridX, gridY } = getMouseGridPos(event);
+  removePartAt(gridX, gridY);
+}
+
+export function handleCanvasMouseLeave() {
+  dragPreview = null;
+  gameState.dragPreview = null;
 }
 
 function launch() {
@@ -107,36 +149,15 @@ function launch() {
   setMode(MODES.FLIGHT_MODE);
 }
 
-export function getPartLibrary() {
-  return PART_LIBRARY;
-}
-
 export function initBuildSystem() {
-  PART_LIBRARY.forEach(addPaletteItem);
-
-  canvas.addEventListener('contextmenu', (event) => {
-    if (gameState.mode !== MODES.BUILD_MODE) return;
-    event.preventDefault();
-    const { col, row } = getGridCellFromMouse(event);
-    if (!isInsideGrid(col, row)) return;
-    removePartAt(col, row);
+  paletteButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      setSelectedPartType(button.dataset.type);
+    });
   });
 
-  canvas.addEventListener('mousedown', (event) => {
-    if (gameState.mode !== MODES.BUILD_MODE || event.button !== 0) return;
-    const { col, row } = getGridCellFromMouse(event);
-    if (!isInsideGrid(col, row)) return;
-    if (dragging?.type) {
-      placePartAt(col, row, dragging.type);
-    } else {
-      selectPart(col, row);
-    }
-  });
-
-  window.addEventListener('mouseup', () => {
-    dragging = null;
-    gameState.draggingFromPalette = null;
-  });
+  canvas.addEventListener('mouseleave', handleCanvasMouseLeave);
 
   launchBtn.addEventListener('click', launch);
+  emit('buildUpdated', gameState.rocketParts);
 }

@@ -1,14 +1,11 @@
 :root {
-  --bg: #0d1321;
   --panel: rgba(8, 12, 20, 0.82);
   --panel-border: rgba(255, 255, 255, 0.16);
   --text: #e9eef7;
   --accent: #58a6ff;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
@@ -31,7 +28,7 @@ body {
   box-shadow: 0 22px 44px rgba(0, 0, 0, 0.4);
 }
 
-#game-canvas {
+#gameCanvas {
   display: block;
   width: 1000px;
   height: 700px;
@@ -52,9 +49,7 @@ body {
   z-index: 5;
 }
 
-#top-bar {
-  top: 0;
-}
+#top-bar { top: 0; }
 
 #bottom-bar {
   bottom: 0;
@@ -92,7 +87,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 6px;
   padding: 8px;
-  cursor: grab;
+  cursor: pointer;
   user-select: none;
   font-size: 13px;
   font-weight: 700;
@@ -100,8 +95,14 @@ body {
   color: #09101f;
 }
 
-.part-item:active {
-  cursor: grabbing;
+.part-item[data-type='nose'] { background: #f6d66d; }
+.part-item[data-type='capsule'] { background: #78c6ff; }
+.part-item[data-type='tank'] { background: #89d67d; }
+.part-item[data-type='engine'] { background: #ff9e57; }
+
+.part-item.selected {
+  outline: 3px solid #ffffff;
+  box-shadow: 0 0 0 2px #1b2940 inset;
 }
 
 .hint {
@@ -122,18 +123,10 @@ button {
   cursor: pointer;
 }
 
-button:hover:enabled {
-  background: #29406a;
-}
+button:hover:enabled { background: #29406a; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
 
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.hidden {
-  display: none !important;
-}
+.hidden { display: none !important; }
 
 #flight-stats {
   display: flex;
@@ -142,6 +135,4 @@ button:disabled {
   font-weight: 700;
 }
 
-#mode-indicator {
-  font-weight: 700;
-}
+#mode-indicator { font-weight: 700; }

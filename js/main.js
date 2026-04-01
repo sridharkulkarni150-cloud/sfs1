@@ -1,8 +1,15 @@
-import { initBuildSystem } from './buildSystem.js';
+import {
+  initBuildSystem,
+  handleCanvasMouseDown,
+  handleCanvasMouseMove,
+  handleCanvasMouseUp,
+  handleCanvasContextMenu
+} from './buildSystem.js';
 import { initPhysicsEngine, updatePhysics } from './physicsEngine.js';
 import { render } from './renderer.js';
 import { gameState, MODES, on, resetGameState, setMode } from './stateManager.js';
 
+const canvas = document.getElementById('gameCanvas');
 const modeIndicator = document.getElementById('mode-indicator');
 const resetBtn = document.getElementById('reset-btn');
 const launchBtn = document.getElementById('launch-btn');
@@ -63,30 +70,23 @@ function registerInput() {
     }
   });
 
-  thrustBtn.addEventListener('mousedown', () => {
-    gameState.keys.thrust = true;
-  });
-  thrustBtn.addEventListener('mouseup', () => {
-    gameState.keys.thrust = false;
-  });
-  thrustBtn.addEventListener('mouseleave', () => {
-    gameState.keys.thrust = false;
-  });
+  thrustBtn.addEventListener('mousedown', () => { gameState.keys.thrust = true; });
+  thrustBtn.addEventListener('mouseup', () => { gameState.keys.thrust = false; });
+  thrustBtn.addEventListener('mouseleave', () => { gameState.keys.thrust = false; });
+
   thrustBtn.addEventListener('touchstart', (event) => {
     event.preventDefault();
     gameState.keys.thrust = true;
   }, { passive: false });
-  thrustBtn.addEventListener('touchend', () => {
-    gameState.keys.thrust = false;
-  });
+  thrustBtn.addEventListener('touchend', () => { gameState.keys.thrust = false; });
 
-  returnBtn.addEventListener('click', () => {
-    setMode(MODES.BUILD_MODE);
-  });
+  returnBtn.addEventListener('click', () => { setMode(MODES.BUILD_MODE); });
+  resetBtn.addEventListener('click', () => { resetGameState(); });
 
-  resetBtn.addEventListener('click', () => {
-    resetGameState();
-  });
+  canvas.addEventListener('mousedown', handleCanvasMouseDown);
+  canvas.addEventListener('mousemove', handleCanvasMouseMove);
+  canvas.addEventListener('mouseup', handleCanvasMouseUp);
+  canvas.addEventListener('contextmenu', handleCanvasContextMenu);
 }
 
 function wireStateEvents() {
