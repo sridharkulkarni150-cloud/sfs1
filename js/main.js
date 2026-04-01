@@ -28,20 +28,25 @@ function updateUiForMode() {
   launchBtn.classList.toggle('hidden', !inBuild);
   thrustBtn.classList.toggle('hidden', inBuild);
   returnBtn.classList.toggle('hidden', inBuild);
-  flightStats.classList.toggle('hidden', inBuild);
+  flightStats.classList.remove('hidden');
   launchBtn.disabled = !gameState.launchReady;
 }
 
 function updateFlightStats() {
   const rocket = gameState.flight.rocket;
-  if (!rocket) return;
-  const fuel = Math.max(0, rocket.fuel).toFixed(0);
-  const altitude = Math.max(0, ((gameState.flight.world.groundY - (rocket.y + rocket.height / 2)) / 10)).toFixed(1);
-  const speed = Math.hypot(rocket.vx, rocket.vy).toFixed(1);
+  if (!rocket) {
+    const totalBuildFuel = gameState.rocketParts.reduce((sum, p) => sum + (p.type === 'tank' ? p.fuel : 0), 0);
+    fuelDisplay.textContent = `Fuel: ${totalBuildFuel.toFixed(0)}`;
+    altitudeDisplay.textContent = 'Altitude: 0.0 m';
+    velocityDisplay.textContent = 'Velocity: 0.0 px/s';
+    return;
+  }
 
-  fuelDisplay.textContent = `Fuel: ${fuel}`;
-  altitudeDisplay.textContent = `Altitude: ${altitude} m`;
-  velocityDisplay.textContent = `Velocity: ${speed} px/s`;
+  const highestY = rocket.y - rocket.height / 2;
+  const altitude = Math.max(0, (620 - highestY) * 0.3);
+  fuelDisplay.textContent = `Fuel: ${Math.max(0, rocket.fuel).toFixed(0)}`;
+  altitudeDisplay.textContent = `Altitude: ${altitude.toFixed(1)} m`;
+  velocityDisplay.textContent = `Velocity: ${(-rocket.vy).toFixed(1)} px/s`;
 }
 
 function registerInput() {
@@ -58,9 +63,7 @@ function registerInput() {
       event.preventDefault();
       gameState.keys[keyMap[event.code]] = true;
     }
-    if (event.code === 'KeyR') {
-      resetGameState();
-    }
+    if (event.code === 'KeyR') resetGameState();
   });
 
   window.addEventListener('keyup', (event) => {
@@ -80,8 +83,8 @@ function registerInput() {
   }, { passive: false });
   thrustBtn.addEventListener('touchend', () => { gameState.keys.thrust = false; });
 
-  returnBtn.addEventListener('click', () => { setMode(MODES.BUILD_MODE); });
-  resetBtn.addEventListener('click', () => { resetGameState(); });
+  returnBtn.addEventListener('click', () => setMode(MODES.BUILD_MODE));
+  resetBtn.addEventListener('click', () => resetGameState());
 
   canvas.addEventListener('mousedown', handleCanvasMouseDown);
   canvas.addEventListener('mousemove', handleCanvasMouseMove);
@@ -93,14 +96,8 @@ function wireStateEvents() {
   on('buildUpdated', () => {
     launchBtn.disabled = !gameState.launchReady;
   });
-
   on('modeChanged', updateUiForMode);
   on('gameReset', updateUiForMode);
-  on('flightEvent', (event) => {
-    if (event?.type === 'crash') {
-      modeIndicator.textContent = 'Mode: FLIGHT (CRASHED)';
-    }
-  });
 }
 
 let lastTime = performance.now();
@@ -121,6 +118,7 @@ function start() {
   registerInput();
   wireStateEvents();
   updateUiForMode();
+  updateFlightStats();
   requestAnimationFrame(gameLoop);
 }
 

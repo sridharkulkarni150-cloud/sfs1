@@ -4,7 +4,7 @@ const PART_LIBRARY = [
   { type: 'nose', label: 'Nose Cone', mass: 80, fuel: 0, maxFuel: 0, thrust: 0, color: '#f6d66d' },
   { type: 'capsule', label: 'Command Capsule', mass: 120, fuel: 0, maxFuel: 0, thrust: 0, color: '#78c6ff' },
   { type: 'tank', label: 'Fuel Tank', mass: 60, fuel: 400, maxFuel: 400, thrust: 0, color: '#89d67d' },
-  { type: 'engine', label: 'Engine', mass: 40, fuel: 0, maxFuel: 0, thrust: 650, color: '#ff9e57' }
+  { type: 'engine', label: 'Engine', mass: 40, fuel: 0, maxFuel: 0, thrust: 1250, color: '#ff9e57' }
 ];
 
 const canvas = document.getElementById('gameCanvas');
@@ -59,10 +59,6 @@ function getMouseGridPos(e) {
   return { gridX: Math.max(0, Math.min(19, gridX)), gridY: Math.max(0, Math.min(11, gridY)) };
 }
 
-function isInsideGrid(gridX, gridY) {
-  return gridX >= 0 && gridX < gameState.grid.cols && gridY >= 0 && gridY < gameState.grid.rows;
-}
-
 function getPartAt(gridX, gridY) {
   return gameState.rocketParts.find((part) => gridX >= part.x && gridX < part.x + part.width && gridY >= part.y && gridY < part.y + part.height) || null;
 }
@@ -72,32 +68,31 @@ function overlaps(gridX, gridY) {
 }
 
 function updatePreview(gridX, gridY) {
-  if (!selectedPartType || !isInsideGrid(gridX, gridY)) {
+  if (!selectedPartType) {
     dragPreview = null;
     gameState.dragPreview = null;
     return;
   }
-  dragPreview = { type: selectedPartType, gridX, gridY };
+  const valid = !overlaps(gridX, gridY);
+  dragPreview = { type: selectedPartType, gridX, gridY, valid };
   gameState.dragPreview = dragPreview;
 }
 
 function placePreviewPart() {
-  if (!dragPreview) return;
-  const { gridX, gridY, type } = dragPreview;
-  if (overlaps(gridX, gridY)) {
+  if (!dragPreview || !dragPreview.valid) {
     dragPreview = null;
     gameState.dragPreview = null;
     return;
   }
 
-  const part = getPartTemplate(type);
+  const part = getPartTemplate(dragPreview.type);
   if (!part) return;
-  part.x = gridX;
-  part.y = gridY;
+  part.x = dragPreview.gridX;
+  part.y = dragPreview.gridY;
   gameState.rocketParts.push(part);
   updateLaunchReady();
 
-  dragPreview = { type: selectedPartType, gridX, gridY };
+  dragPreview = { ...dragPreview, valid: !overlaps(dragPreview.gridX, dragPreview.gridY) };
   gameState.dragPreview = dragPreview;
 }
 
@@ -151,13 +146,10 @@ function launch() {
 
 export function initBuildSystem() {
   paletteButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      setSelectedPartType(button.dataset.type);
-    });
+    button.addEventListener('click', () => setSelectedPartType(button.dataset.type));
   });
 
   canvas.addEventListener('mouseleave', handleCanvasMouseLeave);
-
   launchBtn.addEventListener('click', launch);
   emit('buildUpdated', gameState.rocketParts);
 }
